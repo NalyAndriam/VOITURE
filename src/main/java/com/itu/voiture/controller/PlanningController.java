@@ -1,64 +1,92 @@
 package com.itu.voiture.controller;
 
+import com.itu.voiture.dao.ReservationDao;
+import com.itu.voiture.dao.VoitureDao;
+import com.itu.voiture.model.Reservation;
+import com.itu.voiture.model.Voiture;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import com.itu.voiture.dao.ReservationDao;
-import com.itu.voiture.dao.VoitureDao;
-import com.itu.voiture.dao.impl.ReservationDaoImpl;
-import com.itu.voiture.dao.impl.VoitureDaoImpl;
-import com.itu.voiture.model.Reservation;
-import com.itu.voiture.model.Voiture;
-import com.itu.voiture.util.DatabaseConnection;
-
 import java.sql.Date;
 import java.sql.Time;
+import java.util.ArrayList;
 import java.util.List;
 
 @Controller
 public class PlanningController {
 
-    private final ReservationDao reservationDao = new ReservationDaoImpl();
-    private final VoitureDao voitureDao = new VoitureDaoImpl();
-    private final DatabaseConnection dbConn = new DatabaseConnection(); // une seule instance
+    @Autowired private ReservationDao reservationDao;
+    @Autowired private VoitureDao voitureDao;
 
-    private static final double VITESSE_KMH = 20.0; 
+    @Value("${planning.vitesse.kmh:20.0}")
+    private double vitesseKmh;
 
     @GetMapping("/")
-    public String home(@RequestParam(name = "date", required = false) String dateStr, Model model) {
+    public String home(
+            @RequestParam(name = "date", required = false) String dateStr,
+            @RequestParam(name = "voiture", required = false) String numeroVoiture,
+            Model model) {
 
-        if (dateStr == null || dateStr.isEmpty()) {
-            return "index";
+        List<Reservation> reservations;
+        List<Voiture> voitures = voitureDao.getAll();
+
+        // Initialisation des listes pour éviter NullPointerException
+        for (Voiture v : voitures) {
+            if (v.getReservationsAttribuees() == null) {
+                v.setReservationsAttribuees(new ArrayList<>());
+            }
+            if (v.getHeureDisponible() == null) {
+                v.setHeureDisponible(Time.valueOf("00:00:00"));
+            }
         }
 
-        Date date = Date.valueOf(dateStr);
+        // SI ON A UNE DATE → on filtre par date
+        if (dateStr != null && !dateStr.trim().isEmpty()) {
+            try {
+                Date sqlDate = Date.valueOf(dateStr);
+                reservations = reservationDao.getReservationsByDate(sqlDate);
+                model.addAttribute("selectedDate", dateStr);
+                model.addAttribute("selectedDateAsDate", sqlDate);
+            } catch (Exception e) {
+                model.addAttribute("error", "Date invalide");
+                reservations = reservationDao.getAll(); // fallback
+            }
+        } else {
+            // SINON → on affiche TOUTES les réservations (toutes dates)
+            reservations = reservationDao.getAll();
+            model.addAttribute("selectedDate", ""); // pas de filtre
+        }
 
-        List<Reservation> reservations = reservationDao.getReservationsByDate(date, dbConn);
-        List<Voiture> voitures = voitureDao.getAll(dbConn);
-
+        // Attribution des voitures
         attribuerVoitures(reservations, voitures);
 
-        model.addAttribute("voitures", voitures);
-        model.addAttribute("selectedDate", dateStr);
+        // Filtre optionnel par voiture
+        if (numeroVoiture != null && !numeroVoiture.trim().isEmpty()) {
+            voitures = voitures.stream()
+                    .filter(v -> v.getNumero().equals(numeroVoiture))
+                    .toList();
+        }
 
+        model.addAttribute("voitures", voitures);
         return "index";
     }
 
     private void attribuerVoitures(List<Reservation> reservations, List<Voiture> voitures) {
+        reservations.sort((r1, r2) -> r1.getHeureArrivee().compareTo(r2.getHeureArrivee()));
+
         for (Reservation r : reservations) {
-            if (r.getDistanceKm() <= 0) {
-                continue; 
-            }
+            if (r.getDistanceKm() <= 0) continue;
 
-            double distanceAllerRetour = r.getDistanceKm() * 2;
-            double tempsTrajetHeures = distanceAllerRetour / VITESSE_KMH;
-            r.setTempsTrajetHeures(tempsTrajetHeures);
+            double distanceAR = r.getDistanceKm() * 2;
+            double tempsHeures = distanceAR / vitesseKmh;
+            r.setTempsTrajetHeures(tempsHeures);
 
-            long minutesTrajet = Math.round(tempsTrajetHeures * 60);
-            long millisArrivee = r.getHeureArrivee().getTime();
-            Time heureRetour = new Time(millisArrivee + minutesTrajet * 60_000L);
+            long minutes = Math.round(tempsHeures * 60);
+            Time heureRetour = new Time(r.getHeureArrivee().getTime() + minutes * 60_000L);
             r.setHeureRetour(heureRetour);
 
             for (Voiture v : voitures) {
