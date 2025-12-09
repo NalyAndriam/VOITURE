@@ -6,5 +6,5 @@ import com.itu.voiture.model.Voiture;
 import com.itu.voiture.util.DatabaseConnection;
 
 public interface VoitureDao {
-    List<Voiture> getAll(DatabaseConnection dbConn);
+    List<Voiture> getAll();
 }
