@@ -7,5 +7,6 @@ import com.itu.voiture.model.Reservation;
 import com.itu.voiture.util.DatabaseConnection;
 
 public interface ReservationDao {
-    List<Reservation> getReservationsByDate(Date date, DatabaseConnection dbConn);
+    List<Reservation> getReservationsByDate(Date date);
+    List<Reservation> getAll();
 }
