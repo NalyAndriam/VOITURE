@@ -1,0 +1,13 @@
+com\itu\voiture\dao\ReservationDao.class
+com\itu\voiture\dao\impl\ReservationDaoImpl.class
+com\itu\voiture\dao\impl\VoitureDaoImpl.class
+com\itu\voiture\config\WebAppInitializer.class
+com\itu\voiture\JakartaRestConfiguration.class
+com\itu\voiture\resources\JakartaEE10Resource.class
+com\itu\voiture\model\Voiture.class
+com\itu\voiture\config\WebConfig.class
+com\itu\voiture\model\Hotel.class
+com\itu\voiture\dao\VoitureDao.class
+com\itu\voiture\model\Reservation.class
+com\itu\voiture\util\DatabaseConnection.class
+com\itu\voiture\controller\PlanningController.class
